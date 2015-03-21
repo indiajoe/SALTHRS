@@ -1,2 +1,2 @@
 # SALTHRS
-Code to Reduce SALT HRS spectroscopiy data
+Code to Reduce SALT HRS spectroscopy data
