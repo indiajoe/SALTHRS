@@ -168,14 +168,22 @@ class HRSSpectrum:
                 plt.plot(self.SkyFlux[aper])
                 plt.show()
 
-    def ExtractArcSpectrum(self,apertures=None,ShowPlot=True):
-        """ Extracts the spectrum by summing along column for the input list of appertures """
+    def ExtractArcSpectrum(self,apertures=None,ShowPlot=True, useskyapp = False):
+        """ Extracts the spectrum by summing along column for the input list of appertures 
+        useskyapp = True will extract the arc spectrum from sky appertures.
+        If arc is available through target spectrum, keep default useskyapp = False"""
         print('Extracting Arc Spectrum')
         if apertures is None : apertures = np.arange(1,np.max(self.SkyAppLabel)+1)
         ArcImageArray = fits.getdata(self.ArcFile)
+
+        if useskyapp:
+            AppToUse = self.SkyAppLabel
+        else:
+            AppToUse = self.TargetAppLabel
+
         for aper in apertures:
             print('Aperture : {0}'.format(aper))
-            self.ArcFlux[aper] = np.ma.sum(np.ma.array(ArcImageArray,mask=~(self.SkyAppLabel==aper)),axis=0)
+            self.ArcFlux[aper] = np.ma.sum(np.ma.array(ArcImageArray,mask=~(AppToUse==aper)),axis=0)
             if ShowPlot:
                 plt.plot(self.ArcFlux[aper])
                 plt.show()
@@ -274,15 +282,21 @@ class HRSSpectrum:
                 plt.plot(self.TargetminusSky[aper])
                 plt.show()
 
-    def WavelengthCalibrateTarget(self,apertures=None,method='p2',ShowPlot=True):
+    def WavelengthCalibrateTarget(self,apertures=None,method='p2',ShowPlot=True, applyskyshift= False):
         """ Calculates the wavelength calibration of the spectra in each aperture 
         method : spline  # To fit spline curve to all points
-               : p2     # To fit 2nd order polynomial   (pi where i is an integer will fit i^th order poly)"""
+               : p2     # To fit 2nd order polynomial   (pi where i is an integer will fit i^th order poly)
+        applyskyshift = False, doesnot shift the wavelength calibration. Set it to true if arc lamp was taken in sky fibre."""
         print('Doing Wavelength calibration')
         if apertures is None : apertures = np.arange(1,min(np.max(self.TargetAppLabel),np.max(self.SkyAppLabel))+1)
         for aper in apertures:
             print('Aperture : {0}'.format(aper))
-            shift = self.ShiftScaleSkyLineAVG[aper][0]
+
+            if applyskyshift :
+                shift = self.ShiftScaleSkyLineAVG[aper][0]
+            else:
+                shift = 0
+
             if method == 'spline' : # Fit spline
                 tck=interp.splrep(self.PixelVsWavelength[aper][0],self.PixelVsWavelength[aper][1],s=0)
                 self.Wavelength[aper] = interp.splev(np.arange(len(self.TargetminusSky[aper]))-shift,tck,der=0)
