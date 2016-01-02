@@ -38,7 +38,7 @@ class HRSSpectrum:
         self.SmoothContinuum = dict()
         self.TargetminusSkyNorm = dict()
 
-    def ThresholdLampImages(self,TargetFibreFile='TargetFibreAppMask.npy',SkyFibreFile='SkyFibreAppMask.npy'):
+    def ThresholdLampImages(self,TargetFibreFile='TargetFibreAppMask.npy',SkyFibreFile='SkyFibreAppMask.npy',bsize=401,offset=0):
         """ If .npy files inpute by TargetFibreFile or SkyFibreFile are not found, then it Generates the threshold mask by adaptive thresholding the lamp image for tracing aperture. This mask will also be written to same filename """
         try :
             self.ThresholdedLampTargetMask = np.load(TargetFibreFile)
@@ -46,7 +46,7 @@ class HRSSpectrum:
         except(IOError):
             print('Cannot find the file '+TargetFibreFile)
             print('Proceeding to Adaptive thresholding for Target Fiber Aperture')
-            self.ThresholdedLampTargetMask = self.ImageThreshold(self.LampTargetFibre)
+            self.ThresholdedLampTargetMask = self.ImageThreshold(self.LampTargetFibre,bsize=bsize,offset=offset)
             np.save(TargetFibreFile,self.ThresholdedLampTargetMask)
 
         try :
@@ -55,15 +55,15 @@ class HRSSpectrum:
         except(IOError):
             print('Cannot find the file '+SkyFibreFile)
             print('Proceeding to Adaptive thresholding for Sky Fiber Aperture')
-            self.ThresholdedLampSkyMask = self.ImageThreshold(self.LampSkyFibre)
+            self.ThresholdedLampSkyMask = self.ImageThreshold(self.LampSkyFibre,bsize=bsize,offset=offset)
             np.save(SkyFibreFile,self.ThresholdedLampSkyMask)
             
 
-    def ImageThreshold(self,imgfile):
+    def ImageThreshold(self,imgfile,bsize=401,offset=0):
         """ Returns adptive threholded image """
         imgArray = fits.getdata(imgfile)
         # Adptive thresholding..
-        ThresholdedMask = threshold_adaptive(imgArray, 401)#, 'mean')
+        ThresholdedMask = threshold_adaptive(imgArray, bsize,offset=offset)#, 'mean')
         plt.imshow(np.ma.array(imgArray,mask=~ThresholdedMask))
         plt.colorbar()
         plt.show()
