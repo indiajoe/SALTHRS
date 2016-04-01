@@ -79,7 +79,7 @@ class HRSSpectrum:
         # plt.show()
 
 
-    def LabelAppertures(self, TargetFibreFile='TargetFibreAppLabel.npy',SkyFibreFile='SkyFibreAppLabel.npy'):
+    def LabelAppertures(self, TargetFibreFile='TargetFibreAppLabel.npy',SkyFibreFile='SkyFibreAppLabel.npy',DirectlyEnterRelabel= False):
         """ If .npy files input by TargetFibreFile or SkyFibreFile are not found, then it interactively asks user to label disjoint apperture regions in the mask with sequential labels. This mask will also be written to same filename """
         try :
             self.TargetAppLabel = np.load(TargetFibreFile)
@@ -87,7 +87,7 @@ class HRSSpectrum:
         except(IOError):
             print('Cannot find the file '+TargetFibreFile)
             print('Proceeding to Interactively label appertures for Target Fiber')
-            self.TargetAppLabel = self.LabelDisjointRegions(self.ThresholdedLampTargetMask)
+            self.TargetAppLabel = self.LabelDisjointRegions(self.ThresholdedLampTargetMask,DirectlyEnterRelabel= DirectlyEnterRelabel)
             np.save(TargetFibreFile,self.TargetAppLabel)
 
         try :
@@ -96,11 +96,11 @@ class HRSSpectrum:
         except(IOError):
             print('Cannot find the file '+SkyFibreFile)
             print('Proceeding to Interactively label appertures for Sky Fiber')
-            self.SkyAppLabel = self.LabelDisjointRegions(self.ThresholdedLampSkyMask)
+            self.SkyAppLabel = self.LabelDisjointRegions(self.ThresholdedLampSkyMask,DirectlyEnterRelabel= DirectlyEnterRelabel)
             np.save(SkyFibreFile,self.SkyAppLabel)
 
         
-    def LabelDisjointRegions(self,mask,minarea=1000):
+    def LabelDisjointRegions(self,mask,minarea=1000,DirectlyEnterRelabel= False):
         """ Interactively label disjoint regions in a mask """
 
         labeled_array, num_features = ndimage.label(mask)
@@ -108,15 +108,22 @@ class HRSSpectrum:
         NewLabeledArray = labeled_array.copy()
         sugg = 1
         print('Regions of area less than {0} are discarded'.format(minarea))
-        print('Enter q to discard all remaining regions')
         for label in range(1,np.max(labeled_array)+1):
-            plt.clf()
-#            plt.imshow(np.ma.array(LampTargetArray,mask=~(labeled_array==label)))
-            # plt.colorbar()
-            plt.imshow(np.ma.array(labeled_array,mask=~(labeled_array==label)))
-            plt.show(block=False)
             size = np.sum(labeled_array==label)
-            if size > minarea : # Confirm the region label
+            if size < minarea : # Discard label if the region size is less than min area
+                NewLabeledArray[labeled_array==label] = 0
+                    
+
+        if not DirectlyEnterRelabel:
+            print('Enter q to discard all remaining regions')
+            for label in np.unique(NewLabeledArray):
+                if label == 0: # Skip 0 label
+                    continue
+                plt.clf()
+                # plt.imshow(np.ma.array(LampTargetArray,mask=~(labeled_array==label)))
+                # plt.colorbar()
+                plt.imshow(np.ma.array(labeled_array,mask=~(labeled_array==label)))
+                plt.show(block=False)
                 print('Area of region = {0}'.format(size))
                 print('Current Label : {0}'.format(label))
                 newlbl = sugg
@@ -128,14 +135,40 @@ class HRSSpectrum:
                         break
                     else:
                         newlbl = int(uinput)
-                        
+
                 NewLabeledArray[labeled_array==label] = newlbl
                 sugg = newlbl + 1
 
-            else : #  Discard the region
-                NewLabeledArray[labeled_array==label] = 0
-        
-    
+        else:
+            plt.imshow(NewLabeledArray)
+            plt.colorbar()
+            plt.show(block=False)
+            print('Create a file with the label renames to be executed.')
+            print('File format should be 2 columns :  OldLabel NewLabel')
+            print('Note: If you want to keep old name but also merge another region to same label, give that first')
+            uinputfile = raw_input('Enter the filename :').strip()
+            if uinputfile: #User provided input
+                with open(uinputfile,'r') as labelchangefile:
+                    labelchangelist = [tuple(int(i) for i in entry.rstrip().split()) for entry in labelchangefile \
+                                       if len(entry.rstrip().split()) == 2]
+                print('Label Renaming :',labelchangelist)
+                for oldlabel, newlabel in labelchangelist:
+                    # Remove existance of any pixels by new label
+                    NewLabeledArray[labeled_array == newlabel] = 0  #IMP: this makes the order in which given to merge new region important.. Think...
+                    # Now assign new label
+                    NewLabeledArray[labeled_array == oldlabel] = newlabel
+                    
+                # Remove all other labels..
+                NewLabelList = [newlabel for oldlabel, newlabel in labelchangelist]
+                for label in np.unique(NewLabeledArray):
+                    if label not in NewLabelList:
+                        NewLabeledArray[labeled_array==label] = 0
+
+            else:
+                print('No input given. No relabelling done..')
+
+            
+            
         plt.clf()
         print('New labelled regions')
         plt.imshow(NewLabeledArray)
